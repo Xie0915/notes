@@ -912,3 +912,14 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 
 
 
+## 六、集合
+
+### 1、ConcurrentMap
+
+`java.util.concurrent.ConcurrentMap`:HashMap的线程安全版本，读操作不加锁，写操作通过只对特定的key值加锁
+
+通过锁分段技术保证高并发下的读操作，只对hash值在同一段中的数据才会有竞争
+
+get操作没有加锁，key对应的value值是volatile修饰的，当出现有key值没有value时（失效），会加lock，等待value写入后再读取
+
+并发度ConcurrentLevel设置为2的n次方，根据hash值前缀或者后缀快速定位所属的segment和线性链

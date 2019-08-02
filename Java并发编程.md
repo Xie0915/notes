@@ -220,8 +220,66 @@ newCachedThreadPool;
 
 ​	**Executor 生命周期**
 
+​		ExecutorService 一共有三种运行状态：运行、关闭、已终止；关闭后提交的任务将由拒绝执行处理器处理，它将抛弃任务
+
+```java
+pulbic interface ExecutorService {
+    void shutdown();  //平稳关闭
+    List<Runnable> shutdownNow();  //粗暴关闭
+    boolean isShutdown();
+    boolean isTerminated();
+    boolean awaitTermination(long timeout, TimeUnit unit);
+}
+```
+
 ​		
 
-​	
+**Callable与Future**
+
+​	Runnable不能返回一个值或者说抛出一个异常
+
+​	Future表示一个任务的生命周期，可以判断任务是否完成或者是取消，以及获取任务的结果或者取消任务
+
+```java
+public inteface Future<V>{
+    boolean cancel(...);
+    boolean isCancelled();
+    boolean isDone();
+    V get() throws InterruptedException, ExecutionException, CancelledException;
+    V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, CancelledException, TimeoutException
+}
+```
+
+​	get()方法行为取决于任务状态，任务完成则返回一个值或者是ExecutionException（该异常封装了原有异常）
+
+​	在Runnable与Callable任务提交中包含一个安全发布的过程，提交->运行线程；运行线程->get的线程
+
+
+
+**CompletionService：Executor和BlockingQueue**
+
+​	将callable提交给`CompletionServic`e执行，并表用take和poll方法来获得已完成的结果
+
+​	`ExecutorCompletionService`实现了`CompletionService`，在构造函数中创建一个`BlockingQueue`保存计算结果，计算完成调用`FutureTask`中的Done方法。提交一个任务时，首先将其包装成一个`QueueingFuture`（`FutureTask`的子类），并改写子类的done方法，将结果放在`BlockingQueue`中
+
+
+
+**为任务设定时限**
+
+```java
+V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, CancelledException, TimeoutException
+```
+
+结果可用时，立即返回；指定时限中没有计算出结果，抛出`TimeoutException`
+
+也可以由任务本身管理时限，超时时抛出TimeoutException，并由Future来取消任务
+
+​	**invokeall方法：**
+
+![1564713285745](C:\Users\bingmeishi\AppData\Roaming\Typora\typora-user-images\1564713285745.png)
+
+
+
+## 第八章 线程池使用
 
 ​	

@@ -170,9 +170,11 @@
 
 ### 5、并发容器类
 
+
+
 **并发容器**
 
-​	**ConcurrentHashMap**
+**ConcurrentHashMap**
 
 ​    用一种粒度更细的加锁机制来实现更大程度的共享（分段锁），任意数量的读线程可以并发访问Map，执行读取与执行写入的线程可以并发访问容器，一定数量的写线程可以并发修改Map，并发访问下实现更高的吞吐量，单线程中损失一小部分的性能
 
@@ -181,15 +183,33 @@
 ​	ConcurrentHashMap中提供了一些原子操作（因为不能加锁）
 
 ```java
-V putIfAbsent(K key, V value)
-    ...
+V putIfAbsent(K key, V value);
+boolean remove(K key, V value);
+boolean replace(K key, V oldValue, V newValue);
+V replace(K key, V newValue)
 ```
 
 
 
-**CopyOnWriteArrayList****
+**CopyOnWriteArrayList**
 
-​	用于替代List，在同步过程中不需要对容器进行加锁
+​	用于替代List，在同步过程中不需要对容器进行加锁。
+
+​	对其同步时需要保证底层数组的可见性，每次修改时，都会复制底层数组。
+
+
+
+
+
+**阻塞队列**
+
+​	提供阻塞的put和take方法，以及支持定时的offer和poll方法
+
+​	如果数据项不能被正确加入到队列，offer将会返回一个失败的状态，可以根据这个调整策略
+
+​	类库中有很多BlockingQueue的实现：LinkedBlockingQueue和ArrayBlockingQueue是FIFO队列，分别于LinkedList于ArrayList类似，但是比同步的List拥有更好的并发性能。PriorityBlockingQueue是按优先级排序的队列，还有一种实现是SynchronousQueue，这不是一个队列，它不会为队列中的元素维护存储空间，它维护一组线程。
+
+
 
 
 

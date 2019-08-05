@@ -914,7 +914,106 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 
 ## 六、集合
 
-### 1、ConcurrentMap
+### 1、HashMap
+
+摘自：[Java8 HashMap](https://zhuanlan.zhihu.com/p/21673805)
+
+`java.util.Map`四个实现类：`HashMap` `Hashtable` `LinkedHashMap` `TreeMap`
+
+**特点：**
+
+1、HashMap: 根据键的hashcode存储；遍历顺序不确定；允许一条键的值为null；非线程安全
+
+2、HashTable：映射功能与HashMap类似，是线程安全的，对方法加锁
+
+3、LinkedHashMap：HashMap的子类，保存了插入的次序，遍历是有序的
+
+4、TreeMap：能够将记录按照键排序，key值必须实现comparable接口或者在构造Treemap的时候传入了自定义的comparator
+
+**实现结构：**
+
+数组+链表+红黑树
+
+![1564926537692](C:\Users\bingmeishi\AppData\Roaming\Typora\typora-user-images\1564926537692.png)
+
+**数据底层存储**
+
+（1）哈希类中有一个字段为Node[] table，即哈希桶数组，Node是HashMap的内部类，实现了Map.Entry接口
+
+```java
+static class Node implements Map.Entry<K, V>{
+    final int hash;    //用来定位数组索引位置
+    final K key;
+    V value;
+    Node<K,V> next;   //链表的下一个node
+    Node(int hash, K key, V value, Node<K,V> next) { ... }
+    ...
+}
+```
+
+（2）HashMap采用链地址法，数组加链表的组合，当数据被Hash后，得到数组下标，把数据放在对应下标元素的链表上，（hash碰撞：有时两个key会定位到相同的位置）需要好的Hash算法和扩容机制。
+
+
+
+**HashMap字段**
+
+table的length，Load factor为负载因子(默认值是0.75)，threshold是HashMap所能容纳的最大数据量的Node，size为实际存储的键值对
+
+table的length取2的n次方，主要为了扩容和取模运算时的优化，但是这样会增加哈希碰撞（不是素数），HashMap在定位hash索引时，加入了高位运算的过程
+
+不管怎么设计，链表过长的风险依然存在，因此链表过长时，引入了红黑树
+
+
+
+**功能实现**
+
+**hash**
+
+```java
+取hashcode 高位运算 取模
+static final int hash(Object key){
+    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);  //第一二步，hashcode，高位运算
+}
+static int indexFor(int h, int length) {
+     return h & (length-1);  //第三步 取模运算
+}
+```
+
+通过h & (table.length -1)来得到该对象的保存位，而HashMap底层数组的长度总是2的n次方，这是HashMap在速度上的优化。当length总是2的n次方时，h& (length-1)运算等价于对length取模，也就是h%length，但是&比%具有更高的效率
+
+
+
+**put方法**
+
+1、判断键值对数组table[i]是否为空或为null，否则执行resize()进行扩容；
+
+2、根据键值key计算hash值得到插入的数组索引i，如果table[i]==null，直接新建节点添加，转向6，如果table[i]不为空，转向3；
+
+3、判断table[i]的首个元素是否和key一样，如果相同直接覆盖value，否则转向4，这里的相同指的是hashCode以及equals；
+
+4、判断table[i] 是否为treeNode，即table[i] 是否是红黑树，如果是红黑树，则直接在树中插入键值对，否则转向5
+
+5、遍历table[i]，判断链表长度是否大于8，大于8的话把链表转换为红黑树，在红黑树中执行插入操作，否则进行链表的插入操作；遍历过程中若发现key已经存在直接覆盖value即可；
+
+6、插入成功后，判断实际存在的键值对数量size是否超多了最大容量threshold，如果超过，进行扩容。
+
+
+
+**扩容机制**
+
+本质上是用一个容量更大的数组来替代之前的小数组
+
+在jdk1.7中会重新计算每一个Key的新位置
+
+jdk1.8的优化：扩容为2的幂次方（扩大一倍），元素的位置要么是在原位置，要么是在原位置再移动2次幂的位置，扩容时，只需要看看原来的hash值新增的那个bit是1还是0就好了；这样子省去了rehash的计算；另外，新增的1bit是0还是1可以认为是随机的，因此可以分散节点，同时，节点不会倒置
+
+![preview](https://pic2.zhimg.com/a285d9b2da279a18b052fe5eed69afe9_r.jpg)
+
+
+
+
+
+### 2、ConcurrentMap
 
 `java.util.concurrent.ConcurrentMap`:HashMap的线程安全版本，读操作不加锁，写操作通过只对特定的key值加锁
 
@@ -923,3 +1022,13 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 get操作没有加锁，key对应的value值是volatile修饰的，当出现有key值没有value时（失效），会加lock，等待value写入后再读取
 
 并发度ConcurrentLevel设置为2的n次方，根据hash值前缀或者后缀快速定位所属的segment和线性链
+
+
+
+### 3、HashMap的key为自定义类
+
+重写hashcode()与equals()方法，因为Object默认的hashcode方法是内存地址，因此有可能两个包含完全相同字段的对象其内存地址是不同的
+
+### **4、ArrayList与LinkedList**
+
+ArrayList内存中是连续的，随机访问(get,set)更快，LinkedList基于链表，插入删除更快，前提是要移动到对应的index，否则数据量大时不如Arraylist的速度

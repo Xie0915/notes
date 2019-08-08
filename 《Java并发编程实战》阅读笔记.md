@@ -377,7 +377,7 @@ V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionExcepti
 
 
 
-### 11、显示锁 Lock
+### 11、显式锁 Lock
 
 **为什么显示锁**？
 
@@ -417,6 +417,8 @@ V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionExcepti
 在内置锁无法满足要求的时候使用Reentrantlock，包括：可定时、轮询、中断的锁获取操作，公平队列以及非块结构的锁，否则优先使用synchronized
 
 Reentrantlock还能给出哪些调用帧获得了哪些锁，能够检测和识别石锁发生，但是不能和特定的栈帧联系起来
+
+
 
 
 

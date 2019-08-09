@@ -56,8 +56,6 @@
 
 
 
-
-
 **可见性**
 
 ​	在没有同步的情况下，编译器、处理器以及运行时都可能对执行次序进行一定地调整
@@ -317,7 +315,7 @@ pulbic interface ExecutorService {
 }
 ```
 
-​		
+​	
 
 **Callable与Future**
 

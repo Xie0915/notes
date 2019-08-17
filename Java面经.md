@@ -1062,3 +1062,33 @@ GC ROOTS包括：
 
 **垃圾回收算法**
 
+
+
+
+
+
+
+## 八、Redis
+
+### 1、Redis数据类型
+
+- String：这是最简单的类型，普通的 set 和 get，做简单的 KV 缓存，set，get
+
+- Map：存储结构化的数据，比如一个对象（不能嵌套另外的对象），操作，hset，hget
+
+- List：List可以存一些表型数据，评论列表，粉丝列表
+
+  List可以完成分页（lrange）
+
+  也可以做一个简单的消息队列，从list头进入，从list尾出
+
+```
+lrange mylist 0 3
+lpush mylist
+rpop mylist
+```
+
+
+
+- set：无序集合，自动去重，可以做交集，并集，差集
+- sorted set：是排序的 set，去重但可以排序

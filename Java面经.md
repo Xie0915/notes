@@ -1092,3 +1092,20 @@ rpop mylist
 
 - set：无序集合，自动去重，可以做交集，并集，差集
 - sorted set：是排序的 set，去重但可以排序
+
+
+
+## 九、MySql
+
+### 1、innoDB与MyISAM区别
+
+- innoDB支持事务处理，外键，行级锁
+- MyISAM支持全文索引，查询效率上来说要高一些
+- InnoDB不不保存表的具体行数，MyISAM会有一个额外的值保存行数
+- InnoDB支持聚簇索引，数据文件与索引绑定在一起
+
+如何选择：
+
+- 支持事务的话，innodb
+- 绝大部分读查询，myisam，读写比较多，
+- 系统崩溃后，myisam恢复更加困难

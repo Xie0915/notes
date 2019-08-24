@@ -58,7 +58,9 @@ SessionID 全局唯一
 
 
 
+### 二、Paxos算法
 
+P2c：
 
 
 

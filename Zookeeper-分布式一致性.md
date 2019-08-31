@@ -58,11 +58,75 @@ SessionID 全局唯一
 
 
 
+### 二、Paxos算法
+
+P2c：
+
+
+
+### 四、zookeeper基本概念及ZAB协议
+
+什么是**Zookeeper**
+
+​	==一个分布式数据一致性的解决方案==，能够保证如下的分布式一致性
+
+​		1、顺序一致性：同一个客户端发送的请求，能够按照发起顺序应用到Zookeeper中
+
+​		2、原子性：一个事务在集群上的应用情况是一致的
+
+​		3、单一视图：不管哪个服务器提供的视图是一致的
+
+​		4、可靠性：成功应用某一事务，服务器的状态变更会保留下来
+
+​		5、实时性：一定时间内，可以读到最新的数据状态
+
+
+
+**ZooKeeper基本概念**
+
+集群角色
+
+​	Leader、Follower、Observer： Leader提供读写服务，Follower与Observer提供读服务
+
+会话
+
+​	客户端与服务端的一个TCP长连接
+
+数据节点
+
+​	树型的数据节点，一个ZNode包含数据与属性信息，分为临时节点与永久节点
+
+版本
+
+​	version cversion aversion
+
+Watcher
+
+​	允许用户在指定节点上注册watcher
+
+
+
+**ZAB协议**（ZooKeeper原子广播协议）
+
+核心
+
+​	单一主进程接收并处理所有的事务请求，将服务器数据的状态变更同步到所有的副本上
+
+协议介绍
+
+​	ZAB协议包括两种模式：崩溃回复与消息广播
+
+​	**消息广播**
+
+​		类似于两阶段的提交，proposal提出，超过半数的follower回应ack后即发出commit信息，Leader服务器为每一个事务分配一个全局递增的唯一ID，follower按照ID来对事务进行排序和处理，Leader为每一个Follower建立一个FIFO的队列，follower先将事务写入磁盘日志，并返回一个ack。
 
 
 
 
 
+**崩溃恢复**
+
+​		已经在Leader服务器上提交的事务（同时发出了commit请求）
 
 
 
@@ -230,11 +294,13 @@ SessionID 全局唯一
 
 ​	**数据模型：**ZNode是Zookeeper中最小的数据单元，每个ZNode可以保存数据，也可以挂载子节点
 
+​	**事务ID:** ZooKeeper中事务指能改变服务器状态的操作，对于每一个事务请求，ZooKeeper分配一个全局唯一的ID，用ZXID表示
+
 
 
 ​	**节点类型**：**持久节点、临时节点、顺序节点**，可以组合，对于顺序节点，每个父节点会为其第一级子节点维护一份顺序（创建先后）；临时节点的生命周期与客户端会话绑定在一起，客户端失效，节点会被清理掉。
 
-​		状态信息：每一个数据节点除了存储数据内容以外，还存储节点本身的一些状态信息，Stat类
+​		状态信息：每一个数据节点除了存储数据内容以外，还存储节点本身的一些状态信息，Stat类存储
 
 ![1564367920719](C:\Users\bingmeishi\AppData\Roaming\Typora\typora-user-images\1564367920719.png)
 
@@ -250,7 +316,15 @@ SessionID 全局唯一
 | cversion | 子节点版本号   |
 | aversion | ACL变更版本号  |
 
+​		Zookeeper中版本表示对数据内容，子节点列表，ACL信息的修改次数
+
 ​		Zookeeper中版本实际上时对乐观锁中写入校验的实现
+
+版本与分布式锁：
+
+​		乐观锁三个阶段：读取数据、写入校验、数据写入
+
+​		版本是实现写入校验这一步的，在写入数据时，会比较当前请求的版本version（应该是读取数据时一起读取的），与当前数据节点的version进行对比
 
 ​	
 
@@ -264,7 +338,38 @@ SessionID 全局唯一
 
 ​		**Watcher接口：**
 
-​			定义事件通知的相关逻辑，包含KeeperState和EventType两个枚举类，表示通知状态和枚举类型，同时定义了一个事件的回调方法，`process(WatchedEvent event)`
+​			定义事件通知的相关逻辑，包含KeeperState和EventType两个枚举类，表示通知状态和事件类型，同时定义了一个事件的回调方法，`process(WatchedEvent event)`
+
+​		NodeDataChanged：数据内容或版本号发生改变时触发（用同一数据更新节点）
+
+​		NodeChildrenChanged：子节点列表发生变更时触发
+
+​		WatchedEvent 包含三个属性：通知状态，事件类型，节点路径
+
+​		服务端会将WatchedEvent封装成一个可序列化的WatcherEvent，用于网络传输
+
+
+
+**工作机制**
+
+​		分为三步：客户端注册Watcher，服务端处理watcher，客户端回调watcher
+
+​		**客户端注册watcher：**
+
+​			可以在客户端对象的构造函数中传入默认watcher，也可以通过getData等接口注册watcher
+
+​			在利用getdata等方法注册Watcher时，客户端会封装一个WatcheRegistration对象（保存数据节点路径与Watcher的对应关系），WatcheRegistration会被封装到Packet对象中（这个对象是最小通信单元），然后被发送
+
+​			客户端SendThread线程的readResponse对象会接收响应，并且取出Watcher（还是在WatcherRegistration中）注册到ZKWatcherManager中，最终保存在dataWatches中
+
+```java
+dataWatches: 映射数据节点和Watcher对象
+Map<String, Set<Watcher>>
+```
+
+​			底层序列化过程，并没有将Watcher对象完全封进去（否则注册的watcher一多，服务端内存压力就会很大）
+
+
 
 ​	
 
@@ -272,13 +377,13 @@ SessionID 全局唯一
 
 ​			**ServerCnxn存储（将对应的ServerCnxn存储到WatcherManager中）**
 
-​				判断需要存储Watcher时，将当前的ServerCnxn对象以及数据节点路径传入到getData方法中，最终被存到WatcherManager的watchTable和watch2Path中。watchTable	从数据节点路径的粒度来管理watcher，watch2Path从Watcher粒度来控制事件触发需要触发的数据节点
+​				判断需要存储Watcher时，将当前的ServerCnxn对象（可以理解为一个Watcher对象，实现了watcher接口）以及数据节点路径传入到getData方法中，最终被存到WatcherManager的watchTable和watch2Path中。watchTable	从数据节点路径的粒度来管理watcher，watch2Path从Watcher粒度来控制事件触发需要触发的数据节点
 
 ​			**Watcher触发**
 
 ​				对指定的数据节点完成更新后，调用WatchManager的TriggerWatch方法来触发相关的事件
 
-​				处理逻辑：1、封装WatchedEvent	2、查询Watcher	3、调用process来触发Watcher（这里是ServerCnxn的process方法）
+​				处理逻辑：1、封装WatchedEvent	2、查询Watcher	3、调用process来触发Watcher（这里是ServerCnxn的process方法，这里process的主要逻辑为：1、请求头里标志-1，代表是一个通知；WatchedEvent包装为WatcherEvent，以便序列化传输，向客户端发送通知）
 
 
 
@@ -286,11 +391,11 @@ SessionID 全局唯一
 
 ​				对于来自服务端的相应，客户端都调用SendThread中的readResponse来处理
 
-​				当一个通知事件来临时，典型的处理逻辑为：1、反序列化	2、处理chrootPath	3、还原watchedEvent	4、回调Watcher（将WatchedEvent对象交给EventThread线程）
+​				当一个通知事件来临时，典型的处理逻辑为：1、反序列化	2、处理chrootPath（绝对路径转为相对路径）	3、还原watchedEvent	4、回调Watcher（将WatchedEvent对象交给EventThread线程）
 
 ​				**EventThread处理事件通知：**
 
-​					客户端识别EventType后，从相应的Watcher存储中获取相关的watcher（放到WaitingEvents中），并从Watcher存储中去除
+​					客户端识别EventType后，从相应的ZKWatchManager中获取相关的watcher（放到WaitingEvents中），并从Watcher存储中去除，将所有的watcher放到waitingEvents队列中
 
 ​					EventThread的run方法不断对该队列进行处理（每次取出一个watcher，并调用其process方法）
 
@@ -298,11 +403,11 @@ SessionID 全局唯一
 
 ​		**Watcher特性总结：**
 
-​			**一次性**：Watcher需要反复注册，用以减少服务端的压力
+​			**一次性**：Watcher需要反复注册，用以减少服务端的压力（因为一次注册一直有效的话，更新频繁的节点对服务器压力较大）
 
 ​			**客户端串行执行：**客户端处理watcher是一个串行过程
 
-​			**轻量：**WatchedEvent是Zookeeper中最小通知单元，只包含事件类型，通知状态和节点路径，传输的时候也不会将发送对象传送至服务端，只是通过boolean对象进行标记
+​			**轻量：**WatchedEvent是Zookeeper中最小通知单元，只包含事件类型，通知状态和节点路径，传输的时候也不会将发送对象传送至服务端，只是通过**boolean对象**进行标记（服务端调用boolean getWatch()判断是否需要注册watcher）
 
 
 
@@ -310,27 +415,21 @@ SessionID 全局唯一
 
 **ACL机制（Access Control List）**
 
-​	权限模式（Scheme）授权对象（ID）权限（Permission）
+​	访问控制列表，细粒度的权限管理
 
-​		**权限模式Scheme**
+​	权限模式（Scheme）授权对象（ID）权限（Permission），使用scheme id permission 来标志一个acl信息
+
+​		**权限模式（Scheme）**
 
 ​			确定权限验证过程中使用的策略：1、IP	2、Digest	3、World	4、Super
 
-​		**授予对象：**
+​		**授予对象（ID）**
 
 ​			权限赋予的用户或是一个指定实体，例如IP或是机器
 
-​		**权限：**
+​		**权限（Permission）：**
 
-​			对数据的操作权限分为五类：1、CREATE	2 DELETE	3 READ	4 WRITE	5 ADMIN
-
-
-
-​	权限扩展体系
-
-
-
-
+​			对数据的操作权限分为五类：1、CREATE（允许在该节点下创建子节点）	2 DELETE（允许删除该数据节点的子节点）	3 READ	4 WRITE	5 ADMIN（允许对数据节点进行ACL相关的设置操作）
 
 
 
@@ -346,5 +445,20 @@ SessionID 全局唯一
 
 
 
+**会话**
 
+​		客户端会话可能有多个状态，CONNECTING CONNECTED RECONNECTING RECONNECTED CLOSE等
 
+​		Session是ZooKeeper中的会话实体，代表一个客户端会话，包含四个属性
+
+​		1、SessionID：会话ID，唯一标志一个会话
+
+​		2、TimeOut：会话超时时间
+
+​		3、TickTime：
+
+​		4、isClosing：一个会话是否关闭，一旦超时，服务端设为true，就不在接受该客户端请求
+
+​		
+
+​		SessionTracker 服务端的会话管理器 ，管理会话

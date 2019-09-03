@@ -2158,6 +2158,22 @@ MyCat，proxy 层方案，好处在于对于各个项目是透明的，但是运
 
 ## 十二、Spring相关
 
+### 1、IOC
+
+[见](https://zhuanlan.zhihu.com/p/25459839)
+
+**IOC原理概述**
+
+需要对象的时候需要自己new出来，某些时候坏编程习惯导致无法回收。并且也违反了松耦合，少入侵的原则
+
+### 2、AOP
+
+[见](https://zhuanlan.zhihu.com/p/25522841)
+
+3、
+
+
+
 ## 十三、其他
 
 ### 1、copy-on-write

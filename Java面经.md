@@ -2182,11 +2182,90 @@ Spring的IOC也是一个对象，可以进行对其他对象的控制，包括�
 
 使用这些类需要利用Spring提供的核心类，ApplicationContext，通过该类去加载已声明好的配置文件，然后便可以获取到我们需要的类了。
 
-ClassPathXmlApplicationContext去加载spring的配置文件，
-
 **Spring容器装配Bean（XML配置与注解）**
 
 通过xml对bean进行声明和管理，每一个bean标签都代表着需要被创建的对象并通过property标签可以为该类注入其他依赖对象
+
+ClassPathXmlApplicationContext去加载spring的配置文件，这个初始化时接收多个参数
+
+AnnotationConfigApplicationContext加载Java配置文件（注解配置）
+
+**Spring依赖注入**
+
+当一个bean实例引用另一个bean实例时，spring容器帮助我们创建依赖的bean并注入到原来的bean中，一般有两种方式注入
+
+1、Setter方法注入
+
+对象注入使用property和ref属性注入类，如上述的代码；也可以注入简单值map，set，list等，用property的value属性
+
+```xml
+<property name="books">  
+	<map>  
+        <entry key="10" value="CoreJava"/>  
+        <entry key="12" value="SSH2"/>  
+	</map>  
+</property> 
+注入map
+```
+
+2、构造函数注入
+
+通过构造方法注入依赖
+
+```xml
+<bean name="accountService" class="com.zejian.spring.springIoc.service.impl.AccountServiceImpl">
+    <!-- 构造方法方式注入accountDao对象,-->
+    <constructor-arg  ref="accountDao"/>
+</bean>
+```
+
+**循环依赖**
+
+如果两个类A, B，他们在构造函数中循环依赖，那么spring将无法注入这两个类
+
+**自动装配与注解注入** @Autowired @Resource @Value
+
+@Autowired：byType，基于反射查看bean定义的类，然后找到依赖类型相同的bean注入到另外的bean中，默认参数required=false，有就注入，没有就不注入
+
+@Resource：byName，可以标注类成员变量以及set方法
+
+@Value：上述两种注入方式都不适合简单值，这可以解决硬编码问题
+
+**IOC容器管理bean**
+
+每一个交给IOC容器创建的对象必须分配一个名称，用id属性为Bean分配名称，在一个xml文件中，id属性必须唯一，而name属性可以为一个bean设置多个名称
+
+可以使用@Service注解和@Repository注解标注，其中@Service与@Component注解并无太大差异，但是能让我们感觉到这是业务层的bean，@Repository还可以启动与数据访问相关其他功能，在传入@Component注解属性时，还可以输入一个字符串，表明名称，如果没有，会默认类名作为名称（第一个小写）
+
+**Bean的实例与重写**
+
+Spring默认通过构造函数来实例化，也可以通过配置变成工厂模式
+
+重写，当不同的xml中出现相同id，后面的xml文件会覆盖之前的xml文件
+
+**Bean的作用域**（通过scope="singleton"设置）
+
+Singleton：默认bean是singleton，每隔bean被创建一次，整个应用周期都可以使用
+
+Prototype：每次获取bean实例时都会新创建一个实例对象
+
+**request与session作用域**
+
+request作用域，每一个新的http request会创建一个新的Request作用域的bean实例，因此可以更改其中bean的参数，请求结束后，bean实例被销毁
+
+Session则是一个Session期内有效
+
+通过scope来设置
+
+```java
+@Component
+@Scope(value = "session" , proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class SessionBean {}
+```
+
+**bean延迟加载**
+
+在配置文件中定义，直到使用bean时才加载，默认是spring容器启动时加载bean
 
 ### 2、AOP
 

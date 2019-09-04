@@ -2164,7 +2164,29 @@ MyCat，proxy 层方案，好处在于对于各个项目是透明的，但是运
 
 **IOC原理概述**
 
-需要对象的时候需要自己new出来，某些时候坏编程习惯导致无法回收。并且也违反了松耦合，少入侵的原则
+需要对象的时候需要自己new出来，某些时候坏编程习惯导致无法回收。并且也违反了松耦合，少入侵的原则。最开始有一种解决方法是创建一个接口对象，然后根据需要改变其实现类，但是这样子修改实现类的时候需要修改内部代码
+
+可以通过反射，在运行的时候动态生成某些类，将使用哪个类放在配置文件中，通过配置文件来对接口与实现类进行解耦合
+
+Spring的IOC也是一个对象，可以进行对其他对象的控制，包括初始化，创建，销毁等。需要将要创建的类以及其依赖的类通过配置文件告诉spring。通过IOC可以促进松耦合，这种方式使一个对象依赖的对象以被动的方式传入
+
+```xml
+
+<bean name="accountDao" class="com.zejian.spring.springIoc.dao.impl.AccountDaoImpl"/>
+
+<bean name="accountService" class="com.zejian.spring.springIoc.service.impl.AccountServiceImpl">
+    <!-- 注入accountDao对象,需要set方法-->
+    <property name="accountDao" ref="accountDao"/>
+</bean>
+```
+
+使用这些类需要利用Spring提供的核心类，ApplicationContext，通过该类去加载已声明好的配置文件，然后便可以获取到我们需要的类了。
+
+ClassPathXmlApplicationContext去加载spring的配置文件，
+
+**Spring容器装配Bean（XML配置与注解）**
+
+通过xml对bean进行声明和管理，每一个bean标签都代表着需要被创建的对象并通过property标签可以为该类注入其他依赖对象
 
 ### 2、AOP
 

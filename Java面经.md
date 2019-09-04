@@ -546,6 +546,49 @@ NIO的主要事件有几个：读就绪、写就绪、有新连接到来。
 
 
 
+### 17、动态代理
+
+[见](https://www.zhihu.com/question/20794107/answer/658139129)
+
+静态代理：代理对象=增强代码+目标对象
+
+
+
+**JDK中的动态代理**
+
+代理对象与目标对象都实现相同的接口，为了尽可能保证代理对象的内部结构与目标对象一致，这样对代理对象的所有操作最终都可以转移到目标对象上
+
+JDK提供java.lang.reflect.InvocationHandler接口和 java.lang.reflect.Proxy
+
+Proxy有静态方法：getProxyClass(ClassLoader, interfaces)，只要你给它传入类加载器和一组接口，它就给你返回代理Class对象，这个Class对象就有构造器了，
+
+在代理Class对象的构造器中，会传入一个invocationHandler给代理对象的成员变量，而代理对象的每一个方法都会调用handler.invoke()这个函数，可以让调用者将对象传进来
+
+实际使用中一般使用newProxyInstance，可以直接获得代理对象
+
+```java
+public static Object newProxyInstance(ClassLoader loader,Class<?>[] interfaces,
+                                      InvocationHandler h);
+
+
+new InvocationHandler(){
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        method.invoke(obj, args);
+    }
+其中 obj 就是要代理的对象
+```
+
+代理类也实现了接口，因此可以它可以用对应的接口接收
+
+
+
+**CGLIB动态代理**
+
+通过继承来实现（继承需要代理的对象），CGLibProxy代理类需要实现一个方法拦截器接口MethodInterceptor并重写intercept方法，同理每次调用代理对象的方法时，intercept方法都会被调用，利用该方法便可以在运行时对方法执行前后进行动态增强
+
+
+
 
 
 
@@ -960,7 +1003,7 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 
  2、根据系统的承受能力，调整线程池中工作线程的数目
 
-
+### 7、见
 
 ## 六、集合
 
@@ -2271,7 +2314,124 @@ public class SessionBean {}
 
 [见](https://zhuanlan.zhihu.com/p/25522841)
 
-3、
+**早期的抽取**
+
+将共同代码抽取出来，或者将其写到父类，所有类继承这个类即可，但是这样有一个问题，核心业务中存在不关联的特殊任务，例如日志，权限，事务，错误信息监测等。
+
+日志这种业务涉及到所有的模块，因此需要一种插拔的特性，而不是入侵核心业务代码，这种关注点叫做“横切关注点” AOP技术
+
+**AspectJ**
+
+AspectJ对Java代码进行AOP编译（一般在编译期进行）
+
+pointcut：切点，需要捕捉的方法
+
+```java
+pointcut recordLog():call(* HelloWord.sayHello(..));
+```
+
+advice:：通知before() 前置 after() 后置 after returning() 后置返回 after throwing() 异常通知 around 环绕通知
+
+around可以通过proceed方法控制方法是否执行
+
+```java
+Object around():aroundAdvice(){
+    System.out.println("sayAround 执行前执行");
+    Object result=proceed();//执行目标函数
+    System.out.println("sayAround 执行后执行");
+    return result;
+}
+```
+
+织入：将aspect类应用到目标函数的过程
+
+**切点和通知的组合体就是切面**
+
+**AspectJ 织入方式及原理**
+
+静态织入，编译期织入，在这个期间使用AspectJ的acj编译器(类似javac)把aspect类编译成class字节码后，在java目标类编译时织入，即先编译aspect类再编译目标类
+
+
+
+**Spring AOP开发**
+
+为了统一处理横切业务，采用动态代理技术的实现原理来构建Spring AOP的内部机制（动态织入），这是与AspectJ（静态织入）最根本的区别
+
+使用注解类型的通知函数
+
+```java
+@Before @AfterReturning @Around @AfterThrowing @After
+@Around("execution(* com.zejian.spring.springAop.dao.UserDao.addUser(..))")
+public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+    System.out.println("环绕通知前....");
+    Object obj= (Object) joinPoint.proceed();
+    System.out.println("环绕通知后....");
+    return obj;
+}
+```
+
+
+
+**切入点指示符**
+
+SpringAOP提供了匹配表达式，也叫切入点指示符
+
+通配符:
+
++: 匹配给定类的任意子类
+
+..：匹配方法定义中任意参数
+
+*：匹配任意数量字符
+
+类型签名表达式 within
+
+```java
+within(<type name>)
+//匹配com.zejian.dao包及其子包中所有类中的所有方法
+@Pointcut("within(com.zejian.dao..*)")
+//匹配UserDaoImpl类中所有方法
+@Pointcut("within(com.zejian.dao.UserDaoImpl)")
+//匹配UserDaoImpl类及其子类中所有方法
+@Pointcut("within(com.zejian.dao.UserDaoImpl+)")
+//匹配所有实现UserDao接口的类的所有方法
+@Pointcut("within(com.zejian.dao.UserDao+)")
+```
+
+方法签名表达式 execution
+
+```java
+execution(<scope> <return-type> <fully-qualified-class-name>.*(parameters))
+```
+
+
+
+**通知**
+
+```java
+@Before("execution(* com.zejian.spring.springAop.dao.UserDao.addUser(..))")
+public void before(JoinPoint joinPoint){
+    System.out.println("我是前置通知");
+}
+```
+
+JoinPoint，是Spring提供的静态变量，通过joinPoint 参数，可以获取目标对象的信息,如类名称,方法参数,方法名称等，该参数是可选的。
+
+ProceedingJoinPoint可以执行方法
+
+
+
+**Aspect优先级**
+
+如果同一个切点有多个相同类型的通知，那么优先级高的通知函数会先执行，可以通过重写aspect类的getOrder()函数来定义优先级
+
+
+
+**SpringAOP实现原理概要**
+
+动态代理技术，基于反射的JDK动态代理与基于集成的CGLIB动态代理
+
+
 
 
 

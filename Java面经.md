@@ -601,8 +601,11 @@ new InvocationHandler(){
 
 ### 15、Syncronized关键字
 
-- 内存可见性：
+[见](https://zhuanlan.zhihu.com/p/29866981)
+
+- 内存可见性：一个共享变量被修改了，其他线程能够马上看到
 - 操作原子性：两个同步块只能串行进入
+- 有序性：不会对指令进行重排
 
 **锁的内存语义：**
 
@@ -618,7 +621,7 @@ new InvocationHandler(){
 
 ​	对同一线程synchronized锁时可重入的
 
-底层用mutex lock实现，而Java的线程映射到操作系统的原生线程上，阻塞或唤醒都会用户态与核心态切换；JDK1.6以后进行优化，阻塞之前先自旋等待一段时间
+底层用mutex lock实现，而Java的线程映射到操作系统的原生线程上，阻塞或唤醒都会用户态与核心态切换；JDK1.6以后进行优化，阻塞之前先自旋等待一段时间，因此，synchronized性能与ReentrantLock基本相同，只是后者具有更多的功能，优先考虑synchronized
 
 **Java对象头**
 
@@ -647,7 +650,7 @@ new InvocationHandler(){
 
    - 偏向锁获取：
 
-     查看Mark Word状态-->测试线程ID-->CAS测试或直接进入代码块
+     查看Mark Word状态（是否是偏向锁）-->测试线程ID-->CAS获得锁进入代码块
 
    - 偏向锁释放：
 
@@ -751,7 +754,7 @@ Synchronized (简单情况)
 - 缺点：不能进行高级功能（定时，轮询和可中断等）。
 
 Lock （复杂情况）
-- 优点：可定时的、可轮询的与可中断的锁获取操作，提供了读写锁、公平锁和非公平锁　　 
+- 优点：可定时的(`trylock`)、可轮询(`trylock`)的与可中断(`lockInterruptibly`)的锁获取操作，提供了读写锁、公平锁和非公平锁　　 
 - 缺点：需手动释放锁unlock，不适合JVM进行堆栈跟踪。
 
 
@@ -808,6 +811,16 @@ ObjectMonitor对象的void notify()实现：
 - 如果当前_WaitSet为空，即没有正在等待的线程，则直接返回
 - 通过ObjectMonitor::DequeueWaiter方法，获取_WaitSet列表中的第一个ObjectWaiter节点
 - 根据不同的策略，将取出来的ObjectWaiter节点，加入到_EntryList，或者进行自旋
+
+
+
+1、wait()
+
+wait()的作用是使当前执行代码的线程进行等待，将当前线程置入"预执行队列"中，并且wait()所在的代码处停止执行，直到接到通知或被中断。**在调用wait()之前，线程必须获得该对象的锁，因此只能在同步方法/同步代码块中调用wait()方法**。
+
+2、notify()
+
+notify()的作用是，如果有多个线程等待，那么线程规划器随机挑选出一个wait的线程，对其发出通知notify()，并使它等待获取该对象的对象锁。注意"等待获取该对象的对象锁"，这意味着，即使收到了通知，wait的线程也不会马上获取对象锁，必须等待notify()方法的线程释放锁才可以。**和wait()一样，notify()也要在同步方法/同步代码块中调用**。
 
 ### 20、Java有哪些特性？举例多态？
 
@@ -962,7 +975,11 @@ Runnable接口返回值是void类型，Callable中的call方法是有返回值�
 
 Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等待时间太长没获取到需要的数据的情况下取消该线程的任务
 
-### 4、CyclicBarrier和CountDownLatch的区别
+### 4、CyclicBarrier（栅栏）和CountDownLatch（闭锁）的区别
+
+闭锁：等待事件，资源初始化，服务启动
+
+栅栏：等待线程，所有线程都到达同一点
 
 （1）CyclicBarrier的某个线程运行到某个点上之后，该线程即停止运行，直到所有的线程都到达了这个点，所有线程才重新运行；CountDownLatch则不是，某线程运行到某个点上之后，只是给某个数值-1而已，该线程继续运行
 
@@ -972,11 +989,11 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 
 ### 5、ThreadLocal
 
-用ThreadLocal维护变量时，为每个使用该变量的线程提供独立的变量副本
+ThreadLocal的作用是提供线程内的局部变量，这种变量在线程的生命周期内起作用，减少同一个线程内多个函数或者组件之间一些公共变量的传递的复杂度。用ThreadLocal维护变量时，为每个使用该变量的线程提供独立的变量副本
 
 内部实现：
 
-- 线程内部维护ThreadLocalMap对象，是一个键值对，里面包含了若干个Entry(ThreadLocal, value)，Entry对Key的引用是弱引用，对Value引用是强引用，因此最好调用remove方法去掉对value的引用，但是java也会对这种情况进行优化
+- 线程内部维护ThreadLocalMap(这是ThreadLocal的静态内部类)对象，是一个键值对，里面包含了若干个Entry(ThreadLocal, value)，Entry对Key的引用是弱引用，对Value引用是强引用，因此最好调用remove方法去掉对value的引用，但是java也会对这种情况进行优化
 
 ### 6、线程池
 
@@ -984,11 +1001,21 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
 
 调用ThreadPoolExecutor.submit(Runnable task)提交任务
 
+```java
+public ThreadPoolExecutor(int corePoolSize,
+                          int maximumPoolSize,
+                          long keepAliveTime,
+                          TimeUnit unit,
+                          BlockingQueue<Runnable> workQueue,
+                          ThreadFactory threadFactory,
+                          RejectedExecutionHandler handler)
+```
+
 三个核心的属性：
 
 - 当前线程池大小
 
-- 最大线程池代销（maximunPoolSize):线程池中允许存在的工作者线程的数量上限
+- 最大线程池代销（maximunPoolSize): 线程池中允许存在的工作者线程的数量上限
 - 核心线程大小（corePoolSize）：不大于最大线程池大小的工作者线程数量上限
 
 运行数量少于corePoolSize，首选添加新线程，而不进行排队
@@ -1002,6 +1029,14 @@ Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等
  1、减少创建和销毁线程的次数，每个工作线程被重复利用
 
  2、根据系统的承受能力，调整线程池中工作线程的数目
+
+**submit与execute的区别**
+
+1submit接收Runnable与callable execute只接收runnable
+
+2submit有返回值（Future对象）
+
+3execute中，和普通线程一样捕获异常，而submit必须调用get才行
 
 ### 7、见
 
@@ -1072,7 +1107,7 @@ static int indexFor(int h, int length) {
 }
 ```
 
-通过h & (table.length -1)来得到该对象的保存位，而HashMap底层数组的长度总是2的n次方，这是HashMap在速度上的优化。当length总是2的n次方时，h& (length-1)运算等价于对length取模，也就是h%length，但是&比%具有更高的效率
+高位运算，在tablesize较小的时候，让高16位也参与计算，通过h & (table.length -1)来得到该对象的保存位，而HashMap底层数组的长度总是2的n次方，这是HashMap在速度上的优化。当length总是2的n次方时，h& (length-1)运算等价于对length取模，也就是h%length，但是&比%具有更高的效率
 
 
 
@@ -2435,7 +2470,37 @@ ProceedingJoinPoint可以执行方法
 
 
 
-## 十三、其他
+### 3、SpringBoot启动流程
+
+[见](https://juejin.im/post/5b679fbc5188251aad213110#heading-0)
+
+
+
+## 十三、数据结构
+
+### 1、红黑树
+
+平衡二叉树有缺点，几乎每一次插入，删除会破坏结构，需要花费时间去左旋右旋
+
+红黑树的特点：
+
+1、具有二叉查找树的特点。
+
+2、根节点是黑色的；
+
+3、每个叶子节点都是黑色的空节点（NULL），也就是说，叶子节点不存数据。
+
+4、任何相邻的节点都不能同时为红色，也就是说，红色节点是被黑色节点隔开的。
+
+5、每个节点，从该节点到达其可达的叶子节点是所有路径，都包含相同数目的黑色节点
+
+红黑树是不大严格的平衡二叉树，左子树和右子树只要满足2倍以内的关系就可以了
+
+### 2、B树，B+树
+
+
+
+## 十四、其他
 
 ### 1、copy-on-write
 

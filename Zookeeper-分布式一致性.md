@@ -152,7 +152,7 @@ P2C：对于任意的Mn和Vn，如果[Mn,Vn]被提出，那么存在一个超过
 
 会话
 
-​	客户端与服务端的一个TCP长连接
+​	客户端与服务端的一个TCP长连接。这个链接会执行心跳检测，发送并回应，watcher事件通知
 
 数据节点
 
@@ -170,25 +170,31 @@ Watcher
 
 **ZAB协议**（ZooKeeper原子广播协议）
 
-核心
+**核心**
 
-​	单一主进程接收并处理所有的事务请求，将服务器数据的状态变更同步到所有的副本上
+​	主备架构，单一主进程接收并处理所有的事务请求，将服务器数据的状态变更同步到所有的副本上；需要保证事务的顺序执行；需要保证集群的高可用（Leader挂掉）
 
-协议介绍
+​	核心是定义那些改变服务器状态的事务请求的处理方式：用全局唯一的一个服务器来接收请求，服务器将这个请求转换成Proposal广播，然后过半即提交
 
-​	ZAB协议包括两种模式：崩溃回复与消息广播
+​	分为 崩溃恢复+消息广播
 
-​	**消息广播**
+**消息广播**
 
-​		类似于两阶段的提交，proposal提出，超过半数的follower回应ack后即发出commit信息，Leader服务器为每一个事务分配一个全局递增的唯一ID，follower按照ID来对事务进行排序和处理，Leader为每一个Follower建立一个FIFO的队列，follower先将事务写入磁盘日志，并返回一个ack。
+​	类似于两阶段的提交，proposal提出（这里所有的follower要么正常反馈，要么就抛弃leader），超过半数的follower回应ack后即发出commit信息。
 
-
-
-
+​	整个消息广播过程中，Leader服务器为每一个事务分配一个全局递增的唯一ID，follower按照ID来对事务进行排序和处理，Leader为每一个Follower建立一个FIFO的队列，follower先将事务写入磁盘日志，并返回一个ack。
 
 **崩溃恢复**
 
-​		已经在Leader服务器上提交的事务（同时发出了commit请求）
+​	由于网络故障（Leader与超过半数的follower失去联系）或者是Leader挂掉的话，会进行崩溃恢复
+
+​	两个不一致隐患：
+
+​	1、一个事务已经在Leader上提交，但是广播commit前，挂了
+
+​	2、丢弃只在Leader上被提出的事务
+
+​	方法：选举出的新Leader拥有集群中最大的ZXID  
 
 
 
@@ -222,11 +228,11 @@ Watcher
 
 ​	ZooKeeper提供命名服务帮助应用系统通过一个资源引用的方式来实现对资源的定位和使用
 
-​	1、调用create()接口来创建一个顺序节点，在此基础上，拼接type类型
+​	1、调用create()接口来创建一个顺序节点，例如`job-`，此基础上，拼接type类型
 
 **分布式协调/通知**
 
-
+​	注册watcher机制
 
 **集群管理**
 
@@ -266,7 +272,9 @@ Watcher
 
 ​	如果只想实现master选举，只需要有一个能够保证数据唯一性的组件就可以了，如果是动态master选举，可以基于zookeeper的watcher机制（Zookeeper在写入节点的时候强一致性）
 
+**分布式锁**
 
+​	通过一个数据节点来表示一个锁，用create()来创建一个节点，ZooKeeper会保证只有一个进程创建成功，然后没有创建成功的进程会注册Watcher监听
 
 
 
@@ -368,9 +376,9 @@ Watcher
 
 ​	
 
-**版本**
+**版本--保证分布式数据原子性**
 
-​		Zookeeper为每个数据节点引入了版本信息，包含三个版本
+​		Zookeeper为每个数据节点引入了版本信息，包含三个版本，**这里版本是指对数据节点的修改次数**
 
 | 版本类型 | 说明           |
 | -------- | -------------- |
@@ -386,11 +394,11 @@ Watcher
 
 ​		乐观锁三个阶段：读取数据、写入校验、数据写入
 
-​		版本是实现写入校验这一步的，在写入数据时，会比较当前请求的版本version（应该是读取数据时一起读取的），与当前数据节点的version进行对比
+​		版本是实现**写入校验**这一步的，在写入数据时，会比较当前请求的版本version（应该是读取数据时一起读取的，`int version= setDataRequest.getVersion`），与当前数据节点的version进行对比
 
-​	
+​		
 
-**Watcher**
+**Watcher--数据变更通知**
 
 ​		Zookeeper提供分布式的发布/订阅功能，一个典型的发布/订阅模型定义了一种一对多的订阅关系，Zookeeper通过watcher来实现多订阅者订阅一个主题
 
@@ -401,6 +409,8 @@ Watcher
 ​		**Watcher接口：**
 
 ​			定义事件通知的相关逻辑，包含KeeperState和EventType两个枚举类，表示通知状态和事件类型，同时定义了一个事件的回调方法，`process(WatchedEvent event)`
+
+​		**Watcher事件中封装了通知状态，事件类型以及path**
 
 ​		NodeDataChanged：数据内容或版本号发生改变时触发（用同一数据更新节点）
 
@@ -451,7 +461,7 @@ Map<String, Set<Watcher>>
 
 ​		**客户端回调Watcher**
 
-​				对于来自服务端的相应，客户端都调用SendThread中的readResponse来处理
+​				对于来自服务端的响应，客户端都调用SendThread中的readResponse来处理
 
 ​				当一个通知事件来临时，典型的处理逻辑为：1、反序列化	2、处理chrootPath（绝对路径转为相对路径）	3、还原watchedEvent	4、回调Watcher（将WatchedEvent对象交给EventThread线程）
 
@@ -499,7 +509,7 @@ Map<String, Set<Watcher>>
 
 ​	客户端由以下核心组件组成：
 
-​		1、Zookeeper实例	2、ClientWatchManager	3、HostProvider	4、ClientCnxn
+​		1、Zookeeper实例	2、ClientWatchManager	3、HostProvider	4、ClientCnxn（包含SendThread EventThread）
 
 ​	客户端实例化与启动过程主要可以分为三个步骤：
 

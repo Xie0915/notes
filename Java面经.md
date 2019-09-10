@@ -562,6 +562,8 @@ JDK提供java.lang.reflect.InvocationHandler接口和 java.lang.reflect.Proxy
 
 Proxy有静态方法：getProxyClass(ClassLoader, interfaces)，只要你给它传入类加载器和一组接口，它就给你返回代理Class对象，这个Class对象就有构造器了，
 
+
+
 在代理Class对象的构造器中，会传入一个invocationHandler给代理对象的成员变量，而代理对象的每一个方法都会调用handler.invoke()这个函数，可以让调用者将对象传进来
 
 实际使用中一般使用newProxyInstance，可以直接获得代理对象
@@ -591,8 +593,8 @@ new InvocationHandler(){
 
 ### 18、异常
 
-- **检查性异常：**最具代表的检查性异常是用户错误或问题引起的异常，这是程序员无法预见的。例如要打开一个不存在文件时，一个异常就发生了，这些异常在编译时不能被简单地忽略。
-- **运行时异常：** 运行时异常是可能被程序员避免的异常。与检查性异常相反，运行时异常可以在编译时被忽略
+- runtime：
+- checked：
 
 
 
@@ -760,8 +762,6 @@ Lock （复杂情况）
 - 优点：可定时的(`trylock`)、可轮询(`trylock`)的与可中断(`lockInterruptibly`)的锁获取操作，提供了读写锁、公平锁和非公平锁　　 
 - 缺点：需手动释放锁unlock，不适合JVM进行堆栈跟踪。
 
-
-
 ### 18、final关键字
 
 [参考](https://zhuanlan.zhihu.com/p/33083924)
@@ -790,7 +790,19 @@ public static final int CONST = 5;
 
 
 
+### 19、线程的六种状态
 
+![preview](https://pic1.zhimg.com/v2-20edff079dc147b795e08261be1161f4_r.jpg)
+
+1、初始状态：实现runnable接口或者继承Thread对象，new一个出来，就初始态了
+
+2、Runnable（就绪、运行）：就绪是所有的资源（除了CPU）都已拿到，但是调度程序没有选择这个线程执行，就处于就绪状态，在就绪队列中；运行态占用CPU资源运行
+
+3、阻塞：Java中，阻塞态专指请求锁失败时进入的状态。（重量级锁，对象锁）
+
+4、等待：wait、join、park函数时，当前线程就会进入等待态，处于等待态表示它需要等待其他线程的指示才能继续运行
+
+5、超时等待：主动进入，超时后进入就绪队列
 
 ## 三、面向对象
 
@@ -976,7 +988,7 @@ run()方法调用后，程序还是要在主线程内顺序执行，还是单线
 
 Runnable接口返回值是void类型，Callable中的call方法是有返回值的，是一个泛型，用于和Future，FutureTask配合使用获得异步执行结果
 
-Callable+Future/FutureTask却可以获取多线程运行的结果，可以在等待时间太长没获取到需要的数据的情况下取消该线程的任务
+Callable+Future/FutureTask可以获取多线程运行的结果，可以在等待时间太长没获取到需要的数据的情况下取消该线程的任务
 
 ### 4、CyclicBarrier（栅栏）和CountDownLatch（闭锁）的区别
 
@@ -997,6 +1009,7 @@ ThreadLocal的作用是提供线程内的局部变量，这种变量在线程的
 内部实现：
 
 - 线程内部维护ThreadLocalMap(这是ThreadLocal的静态内部类)对象，是一个键值对，里面包含了若干个Entry(ThreadLocal, value)，Entry对Key的引用是弱引用，对Value引用是强引用，因此最好调用remove方法去掉对value的引用，但是java也会对这种情况进行优化
+- ThreadLocal类只是定义了一系列操作threadlocalmap的方法，threadlocal是由thread类维护的
 
 ### 6、线程池
 
@@ -1018,7 +1031,7 @@ public ThreadPoolExecutor(int corePoolSize,
 
 - 当前线程池大小
 
-- 最大线程池代销（maximunPoolSize): 线程池中允许存在的工作者线程的数量上限
+- 最大线程池大小（maximunPoolSize): 线程池中允许存在的工作者线程的数量上限
 - 核心线程大小（corePoolSize）：不大于最大线程池大小的工作者线程数量上限
 
 运行数量少于corePoolSize，首选添加新线程，而不进行排队
@@ -1040,6 +1053,10 @@ public ThreadPoolExecutor(int corePoolSize,
 2submit有返回值（Future对象）
 
 3execute中，和普通线程一样捕获异常，而submit必须调用get才行
+
+
+
+4、submit不管是runnable还是callable都会将其封装成一个Futuretask对象（因此也是一个Runnable对象），然后调用execute
 
 ### 7、见
 
@@ -1154,7 +1171,8 @@ get操作没有加锁，key对应的value值是volatile修饰的，当出现有k
 
 并发度ConcurrentLevel设置为2的n次方，根据hash值前缀或者后缀快速定位所属的segment和线性链
 
-
+- get方法：通过volatile修饰相关变量，因此不加锁
+- put方法：table懒加载，cas查看桶里面是否有node，如果有的话在加锁处理哈希冲突
 
 ### 3、HashMap的key为自定义类
 
@@ -2235,7 +2253,61 @@ MyCat，proxy 层方案，好处在于对于各个项目是透明的，但是运
 
 ## 十一、Dubbo
 
+### 1、Dubbo工作原理
 
+1、service层：接口层，服务提供者实现，调用者调用
+
+2、config层：配置层，主要是对 dubbo 进行各种配置的
+
+3、proxy层：服务代理层，无论是 consumer 还是 provider，dubbo 都会给你生成代理，代理之间进行网络通信
+
+4、register层：注册层，负责服务的注册和发现
+
+5、cluster层：集群层，封装多个路由以及负载均衡
+
+除此之外，还有monitor （监控调用时间和次数）protocal（封装rpc调用）等等
+
+**工作流程**
+
+1、provider注册 2、consumer订阅 3、consumer 调用 provider 2、consumer 和 provider 都异步通知监控中心
+
+
+
+### 2、Dubbo支持的通信协议，序列化协议
+
+默认走dubbo协议，单一长连接，NIO异步通信，hessian序列化协议
+
+
+
+### 3、负载均衡策略
+
+1、random loadbalance：对provider不同的实例设置不同的权重，流量按权重打在各个provider上
+
+2、roundrobin loadbalance：流量均匀打在各个机器上
+
+3、leastactive loadbalance：不活跃的性能差的机器更少的请求。
+
+4、consistanthash loadbalance：相同参数的请求一定分发到一个 provider 上去
+
+
+
+### 4、集群容错策略
+
+1、failover cluster：失败重试其他机器，可设置重试次数
+
+2、failfast：一次调用失败就立即失败
+
+3、failsafe：出现异常时忽略
+
+
+
+### 5、如何保证幂等性
+
+1、对于一个操作必须有唯一的标志，例如一个订单的id只能支付一次
+
+2、处理完一个请求后，需要由一个标志，防止处理相同的请求
+
+3、处理之前，判断这个请求是否处理过
 
 ## 十二、Spring相关
 
@@ -2503,7 +2575,15 @@ ProceedingJoinPoint可以执行方法
 
 
 
-## 十四、其他
+
+
+## 十四、ElasticSearch
+
+
+
+
+
+## 十五、其他
 
 ### 1、copy-on-write
 
@@ -2512,3 +2592,7 @@ ProceedingJoinPoint可以执行方法
 ​	资源管理方面的一种优化技术，假定多方需要使用同一个资源时，没有必要为每一方都创建该资源的一个完整的副本，反而令多方共享这个资源，当某方需要修改资源的某处时，利用引用计数，把该处复制一个副本，再把跟新的内容写入该副本中，从而节省创建多个完整副本时带来的空间和时间上的开销。
 
 ​	fork技术也是这样的，fork 之后的父进程和子进程完全共享数据段、代码段、堆和栈等的完全副本，而且内核将共享的地址空间的访问权限改变为只读，如果父进程和子进程中的任何一个试图修改这些区域，则内核修改区域的那块内存制作一个副本
+
+### 2、CAS操作
+
+CAS操作是一种无锁算法，当多个线程尝试使用CAS同时更新同一个变量时，只有其中一个线程能更新变量的值(A和内存值V相同时，将内存值V修改为B)，而其它线程都失败，失败的线程并不会被挂起，而是被告知这次竞争中失败，并可以再次尝试(否则什么都不做)

@@ -2730,9 +2730,19 @@ HandlerInterceptor：preHandle， postHandle， afterCompletion
 
 
 
+## 十五、设计模式
+
+**创建型 结构型 行为型 J2EE型**
 
 
-## 十五、其他
+
+创建型：单例、工厂、
+
+
+
+结构型：桥接 组合 装饰器 代理
+
+## 十六、其他
 
 ### 1、copy-on-write
 

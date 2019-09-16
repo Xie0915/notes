@@ -846,6 +846,8 @@ Map<String,String> map2 = new TreeMap<String,String>();
 
 Map接口的不同实现方式
 
+通过继承实现
+
 ### 21、String为什么不可变
 
 [参考](https://www.cnblogs.com/leskang/p/6110631.html)
@@ -1058,7 +1060,47 @@ public ThreadPoolExecutor(int corePoolSize,
 
 4、submit不管是runnable还是callable都会将其封装成一个Futuretask对象（因此也是一个Runnable对象），然后调用execute
 
-### 7、见
+### 7、Monitor 对象
+
+Synchronized重量级锁，锁标志位10，偏向id指向monitor对象的起始地址。monitor对象可以和实际对象一起创建、销毁，或者是线程试图获取对象锁时自动生成，当一个monitor被一个线程所持有后，就处于锁定状态。monitor由ObjectMonitor实现
+
+ObjectMonitor中有两个队列，_WaitSet 和 _EntryList，用来保存ObjectWaiter对象列表( 每个等待锁的线程都会被封装成ObjectWaiter对象)，_owner指向持有ObjectMonitor对象的线程，当多个线程同时访问一段同步代码时，首先会进入 _EntryList 集合，当线程获取到对象的monitor 后进入 _Owner 区域并把monitor中的owner变量设置为当前线程同时monitor中的计数器count加1，若线程调用 wait() 方法，将释放当前持有的monitor，owner变量恢复为null，count自减1，同时该线程进入 WaitSet集合中等待被唤醒。若当前线程执行完毕也将释放monitor(锁)并复位变量的值，以便其他线程进入获取monitor(锁)。如下图所示
+
+### 8、AQS
+
+管理状态，getState setState compareAndSetState...
+
+tryAcquire tryRelease
+
+
+
+Sync集成AQS
+
+以ReentrantLock为例，有一个内部类，sync，对于非阻塞的加锁tryLock，其实是重写了tryAcquire函数，利用CAS操作改变state，对于阻塞的lock操作，其实就是首先cas，然后调用AQS的acquire
+
+1、线程排队：
+
+sync的Lock操作（），在不公平锁中，会通过
+
+获取锁失败时，调用acquireQueued
+
+2、线程如何排队：
+
+在AQS中，有Node这个数据结构：
+
+线程两种等待模式：1、SHARED 2、EXCLUESIVE
+
+线程在队列中的状态枚举：1、CANCELLED  2、SIGNAL 3、CONDITION 4、PROPAGATE
+
+Node同时保存了当前的进程（Thread对象），以及前驱后继
+
+3、等待中的线程如何感知到锁空闲并获得锁
+
+通过acquireQueue函数实现，保证head节点来到锁，其中会循环判断当前节点是否应该阻塞
+
+4、释放锁
+
+调用release方法，unparkSuccessor
 
 ## 六、集合
 
@@ -1947,8 +1989,8 @@ configuratioon
 
 redis cluster：
 
-- 自动将数据进行分片，每个master存放一些数据
-- 提供内置高可用，部分master不可用，也可以继续工作
+- **自动将数据进行分片**，每个master存放一些数据
+- 提供内置**高可用**，部分master不可用，也可以继续工作
 
 redis cluster模式，每隔redist开放两个端口，6379和加1W 16379，16379用来节点间通信，c用来故障检测，配置更新，故障转移。gossip协议，用来高效数据交换
 
@@ -2041,7 +2083,7 @@ redis cluster高可用与主备切换
 
 可以基于ZooKeeper实现分布式锁，每隔系统通过ZooKeeper获得分布式锁，只有一个实例在操作某一个key，别的不允许读和写
 
-写之前，先判断一下value的时间戳是否比缓存的时间戳心，新的话就能够写
+写之前，先判断一下value的时间戳是否比缓存的时间戳心，新的话就能够写（时间戳保存在Mysql中）
 
 
 
@@ -2079,6 +2121,35 @@ RedLock算法：
 4、如果取到了锁，key的真正有效时间等于有效时间减去获取锁所使用的时间（步骤3计算的结果）。
 
 5、获取锁失败，应该在所有Redis实例上进行解锁
+
+
+
+
+
+### 13、保证双写一致性
+
+- 读的时候，先读缓存，缓存没有的话，就读数据库，然后取出数据后放入缓存，同时返回响应。
+- 更新的时候，**先更新数据库，然后再删除缓存**。
+
+**为什么是删除缓存？**
+
+缓存不一定是数据库数据副本，有可能是经过复杂计算的值，更新得代价很大
+
+（例如，一个数据在1s内更新了20次，但是只访问一次）
+
+**缓存不一致及解决方案？**
+
+删除缓存失败（先删缓存，再更新数据库）
+
+**较为复杂的不一致？**
+
+数据发生了变更，先删除了缓存，然后要去修改数据库，此时还没修改。一个请求过来，去读缓存，发现缓存空了，去查询数据库，查到了修改前的旧数据，放到了缓存中。随后数据变更的程序完成了数据库的修改。数据库和缓存中的数据不一样了
+
+解决方法：
+
+1、阻塞读操作（无缓存），放到一个队列里，等待数据更新结束
+
+
 
 
 
@@ -2548,6 +2619,84 @@ ProceedingJoinPoint可以执行方法
 ### 3、SpringBoot启动流程
 
 [见](https://juejin.im/post/5b679fbc5188251aad213110#heading-0)
+
+
+
+### 4、BeanFactory、FactoryBean与ApplicationContext
+
+IOC容器：BeanFactory以及ApplicationContext
+
+两个阶段：
+
+1、容器启动阶段：加载Configuration Metadata，将信息分组为BeanDefinition，注册到BeanDefinitionRegistry中
+
+可以通过实现BeanFactoryPostProcessor来对BeanDefinition中的信息做一些修改
+
+2、Bean实例化阶段
+
+BeanFactory的getBean方法可以被客户端显示调用，也可以在容器内部隐式调用，BeanFactory是延迟初始化，ApplicationContext是所有Bean一起实例
+
+### 5、Spring MVC
+
+Front Controller：`DispatcherServlet`  Page Controller: `Controller`
+
+DispatcerServlet主要工作流程：1、HandlerMapping 2、Controller 3、ViewResolver
+
+**HandlerMapping**：
+
+处理具体的url到具体的Handler的映射关系（Handler可能是Controller，Action等等）
+
+SpringMVC中提供了多种HandlerMapping的实现，例如BeanNameHandlerMapping， SimpleUrlHandlerMapping等等，
+
+可以指定多个HandlerMapping，DispatcherServelet找到第一个可用的Handler后，就不会再执行后续的handler了
+
+**Controller：**
+
+两种Contoller，第一种AbstractController MultiActionController相关，这一类Controller要自行实现所有的关注点，和Servlet那一套有点像；另一种就是BaseCommandContrller相关的，会完成数据绑定，验证等等操作，专注业务逻辑
+
+**ModelAndView：**
+
+包含两个东西，1、视图相关内容，逻辑视图名称或者是View实例	2、模型数据，会将模型数据合并到最终的视图中输出。
+
+如果返回了
+
+实际的处理流程
+
+request->MultiResolver->HandlerMapping->HandlerInterceptor->Controller->HandlerInterceptor->ModelAndView->LocaleResolver->ViewResolver->View->HandlerInterceptor->response
+
+其中HandlerMapping->HandlerInterceptor->Controller>HandlerInterceptor可统称HandlerAdaptor
+
+```java
+public interface HandlerInterceptor {
+    boolean support(Object handler);
+    ModelAndView handle(HttpServletRequest request, HttpServletResponse response， Object handler);
+    long getLastModified(...);
+}
+```
+
+**实际上对于Handler没有任何的要求，甚至可以使一个POJO对象**，在此基础上，需要一个HandlerMapping来映射Handler，需要一个HandlerAdaptor来处理请求，返回。
+
+
+
+HandlerInterceptor：preHandle， postHandle， afterCompletion
+
+实现HandlerInteceptorAdaptor即可
+
+
+
+### 6、基于注解的Controller
+
+1、基于注解的HandlerMapping实现：
+
+​		遍历所有可用的@Controller实现类，根据请求路径信息，与实现类锁标注的处理映射比对
+
+2、基于注解的HandlerAdaptor实现：
+
+​		通过反射查找@RequestMapping的方法定义，然后通过反射调用该方法，并返回ModelAndView
+
+
+
+​		Spring2.5 中AnnotationMethodHandlerAdapter为该种handler默认实现
 
 
 

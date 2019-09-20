@@ -1184,7 +1184,7 @@ static int indexFor(int h, int length) {
 
 **put方法**
 
-1、判断键值对数组table[i]是否为空或为null，否则执行resize()进行扩容；
+1、判断键值对数组table[i]是否为空或为null，否则执行resize()进行扩容；（table懒加载    ）
 
 2、根据键值key计算hash值得到插入的数组索引i，如果table[i]==null，直接新建节点添加，转向6，如果table[i]不为空，转向3；
 
@@ -1210,11 +1210,20 @@ jdk1.8的优化：扩容为2的幂次方（扩大一倍），元素的位置要�
 
 
 
+流程：
 
+1、确定newCapacity，新的table 的长度，懒加载的时候为指定的tablelength或是默认16，其他时候为原数组长度的一倍，然后生成一个新的Node数组
+
+2、遍历老的table，对于一个node e；
+
+- 如果没有next（单一节点），直接在新的数组里面赋值`newTab[e.hash & (newCap - 1)] = e;`
+
+- 如果是红黑树，就将树分裂成两个树，并且，树长度太小的时候转为链表
+- 如果是链表结构，就将它搞成两个链表，Node<K,V> loHead = null, loTail = null;Node<K,V> hiHead = null, hiTail = null;一个链表在数组中的位置一致，另一个则是数组当前位置加上oldCapacity
 
 ### 2、ConcurrentMap
 
-`java.util.concurrent.ConcurrentMap`:HashMap的线程安全版本，读操作不加锁，写操作通过只对特定的key值加锁
+`java.util.concurrent.ConcurrentMap`:HashMap的线程安全版本，读操作不加锁，写操作通过只对特定的key值加锁，统计值最好在单线程环境下使用，不允许key或者value为null
 
 通过锁分段技术保证高并发下的读操作，只对hash值在同一段中的数据才会有竞争
 
@@ -1224,6 +1233,10 @@ get操作没有加锁，key对应的value值是volatile修饰的，当出现有k
 
 - get方法：通过volatile修饰相关变量，因此不加锁
 - put方法：table懒加载，cas查看桶里面是否有node，如果有的话在加锁处理哈希冲突
+
+[下图摘自](https://zhuanlan.zhihu.com/p/35668936)
+
+![preview](https://pic4.zhimg.com/v2-1220679495a37186aac80be7910ef057_r.jpg)
 
 ### 3、HashMap的key为自定义类
 
@@ -1437,8 +1450,6 @@ Region之间的对象引用以及其他收集器中新生代和老年代间的�
 ### 2、Java内存区域
 
 运行时数据区域包括方法区、虚拟机栈、本地方法栈、堆、程序计数器
-
-
 
 **线程私有的有**：程序计数器、虚拟机栈
 
@@ -2217,7 +2228,7 @@ RedLock算法：
 
 ### 3、MVCC
 
-MVCC 是行级锁的一个变种，避免了加锁操作，因此开销更低，大多数都实现了非阻塞的读操作，写操作只锁定固定的行，通过保存数据在某个时间点的快照来实现
+MVCC 是行级锁的一个变种，避免了加锁操作，因此开销更低，通过保存数据在某个时间点的快照来实现
 
 InnoDB的MVCC
 
@@ -2458,6 +2469,12 @@ AnnotationConfigApplicationContext加载Java配置文件（注解配置）
 
 **自动装配与注解注入** @Autowired @Resource @Value
 
+自动装配：三种，ByType, byname, constructor
+
+
+
+**注解注入：**
+
 @Autowired：byType，基于反射查看bean定义的类，然后找到依赖类型相同的bean注入到另外的bean中，默认参数required=false，有就注入，没有就不注入
 
 @Resource：byName，可以标注类成员变量以及set方法
@@ -2480,9 +2497,7 @@ Spring默认通过构造函数来实例化，也可以通过配置变成工厂�
 
 Singleton：默认bean是singleton，每隔bean被创建一次，整个应用周期都可以使用
 
-Prototype：每次获取bean实例时都会新创建一个实例对象
-
-**request与session作用域**
+Prototype：每次获取bean实例时都会新创建一个实例对象**
 
 request作用域，每一个新的http request会创建一个新的Request作用域的bean实例，因此可以更改其中bean的参数，请求结束后，bean实例被销毁
 
@@ -2709,9 +2724,56 @@ HandlerInterceptor：preHandle， postHandle， afterCompletion
 
 
 
+### 7、FactoryBean 和 BeanFactory 的区别
+
+[见](https://www.jianshu.com/p/05c909c9beb0)
+
+**BeanFactory:**
+
+IOC的基础容器接口
+
+```java
+public interface BeanFactory{
+    Object getBean(String name);
+    <T> T getBean(String name, Class<T> requiredType);
+    <T> T getBean(Class<T> requiredType);
+    Object getBean(String name, Object... args);
+    boolean containsBean(String name);
+    boolean isSingleton(String name);
+    boolean isPrototype(String name);
+    boolean isTypeMatch(String name, Class<?> targetType);
+    Class<?> getType(String name);
+    String[] getAliases(String name);
+} 
+```
+
+BeanFactory有一个子类ClassPathXmlApplicationContext，加载xml文件，返回相关的bean
+
+
+
+**FactoryBean：**
+
+Spring中提供了两种类型的Bean，一种就是通过调用`getBean(id)`方法获得的Bean，另一种就是`FactoryBean`，工厂Bean，通过`getBean(id)`方法获得的是该工厂生产的实例，而不是FactoryBean实例。
+
+`FactoryBean` 是一个 Bean，`FactoryBean` 希望你实现了它之后返回一些内容，Spring 会按照这些内容去注册 bean
+
+```java
+public interface FactoryBean{
+    T getObject();
+    Class<?> getObjectType();
+    boolean isSingleton();
+}
+```
+
+
+
+
+
 ## 十三、数据结构
 
 ### 1、红黑树
+
+[见](https://tech.meituan.com/2016/12/02/redblack-tree.html)
 
 平衡二叉树有缺点，几乎每一次插入，删除会破坏结构，需要花费时间去左旋右旋
 
@@ -2729,9 +2791,53 @@ HandlerInterceptor：preHandle， postHandle， afterCompletion
 
 红黑树是不大严格的平衡二叉树，左子树和右子树只要满足2倍以内的关系就可以了
 
+
+
+插入操作：
+
+像root节点回溯，一旦节点都符合红黑树定义，则结束；向上回溯因为插入过程可能会改变父节点和叔叔节点的颜色，进而改变祖父的颜色（根节点到任一节点的黑色节点相同），祖父颜色有可能会和其父亲颜色重合
+
+删除操作：
+
+需要向兄弟节点借调节点
+
 ### 2、B树，B+树
 
+M阶B树：
 
+1、非叶子节点包含索引列的值大于1 小于等于M
+
+2、叶子节点个数大于等于ceil(m/2)-1，其中ceil为向上取整
+
+3、叶子节点在同一层
+
+
+
+B+树与B树区别：
+
+1、B+树在非叶子节点中不保存数据指针，只保存索引列，因此非叶子节点能保存更多数据
+
+2、每次数据查询次数相同，都到叶子节点
+
+3、叶子节点有序，会存下一个叶子页的起始地址
+
+
+
+B+树特点：
+
+1、B+**树的层级更少**：相较于B树B+每个**非叶子**节点存储的关键字数更多，树的层级更少所以查询数据更快；
+
+2、B+**树查询速度更稳定**：B+所有关键字数据地址都存在**叶子**节点上，所以每次查找的次数都相同所以查询速度要比B树更稳定;
+
+3、B+**树天然具备排序功能：**B+树所有的**叶子**节点数据构成了一个有序链表，在查询大小区间的数据时候更方便，数据紧密性很高，缓存的命中率也会比B树高。
+
+4、B+**树全节点遍历更快：**B+树遍历整棵树只需要遍历所有的**叶子**节点即可，，而不需要像B树一样需要对每一层进行遍历，这有利于数据库做全表扫描。
+
+
+
+### 3、解决哈希冲突
+
+链表 ， 开放寻址， 平方寻址
 
 
 
@@ -2799,11 +2905,25 @@ HandlerInterceptor：preHandle， postHandle， afterCompletion
 
 ### 3、观察者模式
 
-定义了对象之间的一对多依赖，一个对象改变状态时，所有依赖者都会收到通知并更新（观察者依赖主题）
+定义了对象之间的一对多依赖，一个对象改变状态时，所有依赖者都会收到通知并更新（观察者依赖主题），观察者模式提供了一种对象设计，让主题和观察者之间松耦合。
+
+两种方式（推/拉）
 
 主题接口：提供register remove notify接口
 
-## 十六、其他
+观察者接口：update()方法
+
+
+
+## 十六、Git
+
+1、git merge 与 git rebase 区别
+
+Merge命令会保留所有commit的历史时间。每个分支上都会继续保留各自的代码记录, 主分支上只保留merge的历史记录。子分支随时都有可能被删除。子分子删除以后，你能够看到的记录也就是，merge某branch到某branch上了。这个历史记录描述基本上是没有意义的。
+
+rebase, 这个命令会始终把最新的修改放到最前。比如对主branch进行rebase以后, 所有修改就会在branch当前所有的修改之前。
+
+## 十七、其他
 
 ### 1、copy-on-write
 
@@ -2816,3 +2936,20 @@ HandlerInterceptor：preHandle， postHandle， afterCompletion
 ### 2、CAS操作
 
 CAS操作是一种无锁算法，当多个线程尝试使用CAS同时更新同一个变量时，只有其中一个线程能更新变量的值(A和内存值V相同时，将内存值V修改为B)，而其它线程都失败，失败的线程并不会被挂起，而是被告知这次竞争中失败，并可以再次尝试(否则什么都不做)
+
+### 3、epoll
+
+1、调用epoll_create创建一个eventpoll对象
+
+2、调用epoll_ctl添加或者删除需要监听的socket，内核会将eventpoll对象添加到socket的等待队列中，socket接收到数据，中断程序直接操作eventpoll对象，而不是唤醒进程
+
+3、中断程序会给eventpoll对象的就绪列表（rdlist）中添加socket引用，eventpoll对象相当于是socket和进程之间的中介，socket的数据接收并不直接影响进程，而是通过改变eventpoll的就绪列表来改变进程状态。
+
+4、进程A运行到epoll_wait，内核会将A进程放入到epollevent的等待队列中，然后阻塞进程，当socket接收到数据后，中断程序一般写rdlist，一边唤醒epollevent等待队列中的进程
+
+数据结构：
+
+双向链表来实现就绪队列
+
+epoll使用了红黑树作为索引结构
+

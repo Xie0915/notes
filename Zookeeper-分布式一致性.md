@@ -110,7 +110,7 @@ P2C：对于任意的Mn和Vn，如果[Mn,Vn]被提出，那么存在一个超过
 
 生成提案过程：
 
-1、Proposer选择一个新的编号Mn，想某个Acceptor集合成员发送请求，Acceptor做出以下回应
+1、Proposer选择一个新的编号Mn，向某个Acceptor集合成员发送请求，Acceptor做出以下回应
 
 ​	不再批准编号小于Mn的提案， 如果批准过，则反馈最大编号的value
 

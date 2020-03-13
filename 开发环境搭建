@@ -1,0 +1,125 @@
+一、centOS7
+
+1、配置固定ip
+vim /etc/sysconfig/network-scipts/ifcfg-ens33
+
+添加
+IPADDR=192.168.145.30
+GATEWAY=192.168.145.2
+NETMASK=255.255.255.0
+DNS1=114.114.114.114
+
+更改
+BOOTPROTO=static
+ONBOOT=yes
+
+重启服务
+systemctl network restart
+
+
+2、设置默认运行级别
+(ref: /etc/inittab)
+# multi-user.target: analogous to runlevel 3
+# graphical.target: analogous to runlevel 5
+
+# 设置为3
+systemctl set-default multi-user.target
+
+
+二、docker
+
+1、安装
+- centos6
+yum install -y epel-release
+yum install -y docker-io
+
+- centos7 (ref: https://docs.docker.com/install/linux/docker-ce/centos/)
+
+1) 删除旧依赖
+	yum remove docker \
+			  docker-client \
+			  docker-client-latest \
+			  docker-common \
+			  docker-latest \
+			  docker-latest-logrotate \
+			  docker-logrotate \
+			  docker-engine
+
+2) 安装软件包
+	yum install -y yum-utils device-mapper-persistent-data lvm2
+	
+3) 配置repo
+	yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+	(如果失败就直接下镜像，移到 /etc/yum.repos.d/docker-ce.repo)
+	
+4) 更新yum软件包索引
+	yum makecache fast
+	
+5) 安装docker-ce
+	yum -y install docker-ce
+
+
+2、配置阿里云镜像
+mkdir -p /etc/docker
+vim /etc/docker/daemon.json
+{
+  "registry-mirrors": ["https://yt7nmrsf.mirror.aliyuncs.com"]
+}
+systemctl daemon-reload
+systemctl restart docker
+
+
+3、启动mysql
+docker run -p 3306:3306 --name mysql -v /root/mysql/conf:/etc/mysql -v /root/mysql/logs:/logs -v /root/mysql/data:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root -d mysql:5.7
+ 
+docker exec -it 容器id /bin/bash
+
+
+4、启动redis
+docker run -p 6379:6379 -v /var/lib/redis/data:/data -v /root/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf  -d redis:3.2 redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+
+
+
+三、idea
+
+1、更改内存
+修改idea64.exe.vmoptions
+
+-Xms512m
+-Xmx2048m
+-XX:ReservedCodeCacheSize=480m
+
+2、常用plugin
+lombok
+alibabajava
+gsonformat
+
+3、自动导包
+setting-auto import-add unambiguous imports on the fly
+
+四、mysql
+
+- 安装
+	1、mysql组 mysql用户
+	2、解压tar包
+	3、修改文件夹权限为mysql
+	4、修改密码：
+			update user set authentication_string=password('root') where user='root' and host='localhost';
+			flush privileges;
+	5、mysql.server start;
+
+- 远程登录，开放端口或者关闭防火墙，并且update root用户的host为%
+
+- 开机自启动：
+	1.mysql.service cp到/etc/init.d/mysql
+	2.chkconfig --add mysql
+	3.chkconfig --level 3 mysql on
+	
+五、redis
+- 安装
+
+- 开机自启动：
+	1.redis目录下，util中启动脚本redis- cp到/etc/init.d/redis
+	2.chkconfig --add redis
+	3.chkconfig --level 3 redis on
+

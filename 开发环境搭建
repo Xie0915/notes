@@ -25,6 +25,9 @@ systemctl network restart
 # 设置为3
 systemctl set-default multi-user.target
 
+3、关闭防火墙
+systemctl stop firewalld
+systemctl disable firewalld
 
 二、docker
 
@@ -123,3 +126,26 @@ setting-auto import-add unambiguous imports on the fly
 	2.chkconfig --add redis
 	3.chkconfig --level 3 redis on
 
+六、fastdfs
+
+
+
+- ngx-fastdfs-module
+	1.修改src目录下的config文件
+	CORE_INCS="$CORE_INCS /usr/include/fastdfs/ /usr/include/fastcommon/"
+	2.将mod_fastdfs.conf拷贝至/etc/fdfs下，并修改
+		1.tracker_server 至tracker的地址
+		2.storage_path0 至storage存储数据的地址（在storage配置文件中可以找到）
+		3.url_have_group 设置为true
+		4.base_path 设置为fastdfs安装路径
+		
+- nginx配置
+	1.添加fastdfs模块
+	./configure --add-module=../fastdfs-nginx-module-master/src
+	make && make install
+	安装完成可使用nginx -V 查看
+	2.配置nginx.conf 的80端口
+	location ~/group([0-9])/M00 {
+		ngx_fastdfs_module;
+	}
+		

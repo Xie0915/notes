@@ -233,3 +233,226 @@ c:_0-ref: c:_参数位置-ref:
 <bean id="vehicle" class="com.yuan.Vehicle" c:_-ref="wheel"/>
  ```
 
+
+
+装配字面量
+
+- 使用value属性
+
+```xml
+<bean id="vehicle" class="com.yuan.Vehicle">
+	<constructor-arg value="porsche 911"/>
+</bean>
+<bean id="vehicle" class="com.yuan.Vehicle" c:_0="porsche 911"/>
+```
+
+
+
+装配集合
+
+```xml
+<bean id="vehicle" class="com.yuan.Vehicle">
+	<constructor-arg>
+        <list>
+            <ref bean="LeftWheel"/>
+            <ref bean="RightWheel"/>
+        </list>
+</bean>
+```
+
+当构造参数是List时，可以用list标签；当构造参数为Set时，也可以使用set标签
+
+list和set可以也用来装配数组，而c-命名空间无法装配集合
+
+
+
+#### 2.4.4 setter方法注入
+
+
+
+使用property标签完成setter注入，一般对于强依赖的属性，用构造方法注入，对于可选择依赖，可用Setter注入
+
+- property标签
+- p-命名空间：用法与c-相似
+
+```xml
+<bean id="vehicle" class="com.yuan.Vehicle">
+	<property name="Passenger" ref="yuan"/>
+</bean>
+```
+
+
+
+装配字面量
+
+- 使用value属性
+
+
+
+装配集合
+
+- 使用list或者set
+
+
+
+util命名空间，可以使用util:list元素，这会创建一个列表bean，在其他地方可以进行引用
+
+```xml
+<util:list id="tracklist">
+	<value>1</value>
+    <value>2</value>
+    <value>3</value>
+</util:list>
+
+<bean id="vehicle" class="com.yuan.Vehicle" p:nums-ref="tracklist">
+```
+
+
+
+### 2.5 混合使用
+
+1、在JavaConfig中引入其他JavaConfig配置   `@Import`
+
+```java
+@Configuration
+@Import(EngineConfig.class)
+public class VehicleConfig {
+    
+}
+```
+
+
+
+2、在JavaConfig中引入xml配置  `@ImportResource`
+
+```java
+@Configuration
+@ImportResource("classpath:engine-config.xml")
+public class VehicleConfig {
+    
+}
+```
+
+
+
+3、在xml配置中引入xml配置  `<import>`
+
+```xml
+<import resource="engine-config.xml"/>
+```
+
+
+
+4、在xml配置中引入JavaConfig配置  `<bean>`
+
+```xml
+<bean class="EngineConfig.class"/>
+```
+
+
+
+
+
+## 第三章 高级装配
+
+
+
+### 3.1 环境与Profile
+
+#### 3.1.1 配置profile
+
+在JavaConfig中，通过 `Profile` 注解来标注配置类或是bean注解的方法
+
+```java
+public class Config {
+    @Bean
+    @Profile("dev")
+    public Datasource datasource(){
+        ...
+    }
+}
+
+@Configuration
+@Profile("prod")
+public class Config {
+    @Bean
+    @Profile("dev")
+    public Datasource datasource(){
+        ...
+    }
+}
+```
+
+
+
+在xml配置中，通过profile属性指定`<beans>`标签的profile，也可以在`<beans>`中嵌套`<beans>`
+
+```xml
+<beans profile='dev'>
+</beans>
+
+<beans>
+    <beans profile="dev"></beans>
+    <beans profile="prod"></beans>
+</beans>
+```
+
+
+
+#### 3.1.2 激活不同的profile
+
+设置两个属性，来激活不同的profile，有多种方法可以设置这两个属性，如果都未设置，则只会加载那些没有标注Profile的Bean
+
+```
+spring.profiles.default
+spring.profiles.active
+```
+
+
+
+### 3.2 条件化的Bean
+
+`@Conditional`注解，使得bean在特定的条件下才进行创建
+
+```java
+@Bean
+@Conditional(WheelExistCondition.class)
+```
+
+该注解通过Condition接口进行判断，即上述`WheelExistCondition`需要实现Condition接口，该接口只包含一个match方法，返回true则装配该Bean
+
+```java
+Boolean match(ConditionContext context, AnotatedTypeMetadata metadata);
+```
+
+通过ConditionContext接口，可以bean的定义，属性，环境变量，加载的资源等等。
+
+通过AnotatedTypeMetadata，可以得到@Bean注解的方法是否还有其他的注解等
+
+
+
+### 3.3 自动装配的歧义性
+
+当有多个Bean满足自动装配时，会产生歧义，解决方法：
+
+
+
+1、将其中一个可选的bean设置为primary，使用`@Primary`注解，可同时和`@Component`，`@Bean`使用，在xml配置中，可以设置primary="true"
+
+2、添加限定符，缩小匹配的范围，使用`@Qualifier`注解，可以与`@Autowired`一起使用
+
+```java
+@Autowired
+@Qualifier("leftWheel")
+public Wheel wheel;
+```
+
+上述表名装配的bean包含字符串类型leftWheel的限定符，当创建Bean时，如果未指定限定符，则其限定符为bean的id
+
+当创建带有限定符的bean时，也可以使用`@Qualifier`注解，使其搭配`@Component`，`@Bean`使用，通常，限定符用于指定bean的特性，而非id
+
+
+
+### 3.4 Bean作用域
+
+默认情况下，Bean以单例的模式进行创建

@@ -96,6 +96,11 @@ docker run -p 6379:6379 -v /var/lib/redis/data:/data -v /root/redis/conf/redis.c
 lombok
 alibabajava
 gsonformat
+restfultoolkit
+free-mybatis-plugin
+codeglance
+rainbowbrackets
+
 
 3、自动导包
 setting-auto import-add unambiguous imports on the fly

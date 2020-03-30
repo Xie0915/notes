@@ -456,3 +456,270 @@ public Wheel wheel;
 ### 3.4 Bean作用域
 
 默认情况下，Bean以单例的模式进行创建
+
+
+
+Spring中Bean的作用域：
+
+- 单例（Singleton）：整个应用中，只创建一个对象
+- 原型（Prototype）：每次注入或者是根据上下文请求对象时，创建新的
+- 会话（Session）：Web应用中，为每一个会话创建一个新的对象
+- 请求（Request）：Web应用中，为每一次请求创建一个新的对象
+
+
+
+用`@Scope`注解创建不同的作用域，与`@Component`，`@Bean`搭配使用
+
+```java
+@Component   //或者@Bean
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+
+也可以@Scope("prototype")，但上述更安全
+```
+
+```xml
+<bean id... scope="prototype"...></bean>
+```
+
+
+
+@Scope包含属性 proxyMode
+
+```java
+@Scope(value="", proxyMode="ScopeProxyMode.INTERFACES")
+需要代理的为一个接口
+
+@Scope(value="", proxyMode="ScopeProxyMode.TARGET_CLASS")
+需要代理的为一个类
+```
+
+
+
+当在一个单例的bean中注入一个会话类型的bean时，由于单例bean是上下文构建的时候创建的（此时会话类型的bean还未创建），Spring会创建一个代理类注入到相应的单例bean中
+
+
+
+xml中，使用下列指定代理模式
+
+```xml
+<aop:scoped-proxy proxy-target-class="true(false)"/>
+默认使用CGLIB代理
+```
+
+
+
+
+
+### 3.5 运行时值注入
+
+为了避免将值硬编码，使用属性占位符或是spring表达式语言完成值的注入
+
+#### 3.5.1 注入外部值
+
+使用`@PropertySource`引入外部配置文件
+
+```java
+@Configuration
+@PropertySource("classpath:value.properties")
+public class config {
+    @Autowired
+    Environment env;
+    
+    @Bean
+    public ... {
+        env.getProperty("jdbc.url");
+    }
+}
+
+String getProperty(String key, String default);
+T getProperty(String key, Class<T> type, T default);
+
+getRequiredProperty: 给定的值必须被定义
+```
+
+
+
+**spring占位符：**
+
+在xml中，使用`${}`占位符，引入外部值
+
+```xml
+<bean c:_url="${jdbc.url}"/>
+
+需要配置
+<beans>
+    <context:property-placeholder/>
+</beans>
+```
+
+在java代码中，使用`@Value`注解
+
+```java
+public Datasource datasource(@Value("$(jdbc.url)") String url, 
+                             @Value("$(jdbc.user)") String user...)
+    
+使用Value时，需要配置一个Bean时上述配置生效
+
+@Bean
+public PropertySourcesPlaceHolderConfigurer ... {
+    return new PropertySourcesPlaceHolderConfigurer();
+}
+```
+
+
+
+#### 3.5.2 Spring表达式语言进行装配(SpEL)
+
+`#{}` 表达式
+
+
+
+**表示字面量**：可用于表示浮点数 字符串 布尔等类型
+
+```
+#{3.1415} #{"stirng"} #{false}
+```
+
+**引用Bean、属性、方法**：可以利用SpEL将一个bean装入到另一个bean中，这时使用的就是bean的id值
+
+```
+#{vehicle}
+#{vehicle.wheel}
+#{vehicle.stop()}
+#{vehicle.name()?.toUpperCase()}  这里name返回一个String，可以调用后续String的方法，?表示进行类型检查，是一个可选的参数
+```
+
+**使用类型**：T()
+
+```
+#{T(java.lang.Math)}
+
+这里T返回一个Class对象，可以装入特定的Class类型中，但是T通常用来访问静态属性以及静态方法
+#{T(java.lang.Math).PI}
+```
+
+
+
+SpEL表达式同时提供多种运算符
+
+
+
+
+
+## 第九章 Spring Security
+
+### 9.1 简介
+
+#### 9.1.1 模块
+
+Spring Security共分为11个模块
+
+ACL 切面 CAS客户端 配置 核心 加密 LDAP OPENID Remoting 标签库(Tag Library) Web
+
+至少需要包含配置（Configuration）和核心（Core）模块
+
+
+
+#### 9.1.2 过滤Web请求
+
+Spring Security通过一系列的Servlet Filter提供安全性功能
+
+`DelegatingFilterProxy`是一个特殊的Filter，它将工作委托给一个java.servlet.Filter的实现类，这个实现类是作为一个Bean注册到Spring的上下文中
+
+`springSecurityFilterChain`是另一个filter，可以链接一个或多个Fileter
+
+
+
+#### 9.1.3 编写简单的安全性配置
+
+`@EnableWebSecurity`注解能够启用Web安全性，但本身无作用
+
+配置必须写在实现了`WebSecurityConfigurer`中，或者扩展`WebSecurityConfigurerAdapter`，
+
+可以通过重载`WebSecurityConfigurerAdapter`中的三个方法来控制安全行为
+
+| 方法                                      | 作用                          |
+| ----------------------------------------- | ----------------------------- |
+| configure(WebSecurity)                    | 配置Spring Security的Filter链 |
+| configure(HttpSecurity)                   | 配置通过拦截器拦截http请求    |
+| configure(AuthentificationManagerBuilder) | 配置用户相关服务              |
+
+
+
+### 9.2 选择查询用户详细信息的服务
+
+#### 9.2.1 基于内存
+
+`AuthentificationManagerBuilder`的`isMemoryAuthentication`方法，配置基于内存的用户服务
+
+#### 9.2.2 基于数据库表
+
+`AuthentificationManagerBuilder`的`jdbcAuthentication`方法
+
+可以使用PasswordEncoder接口对密码进行加密
+
+
+
+### 9.3 拦截请求
+
+通过`configure(HttpSecurity)`方法进行配置
+
+```java
+protected void configure(HttpSecurity http) {
+    http
+        .authorizeRequests()
+        .antMatchers().authenticated()
+        .regexMatchers().permitAll();
+}
+
+antMatchers 指定路径（支持Ant形式的通配符）
+regexMatchers 正则式路径
+authenticated 需要认证
+permitAll 放行
+```
+
+
+
+#### 9.3.1 Spring表达式实现多维认证
+
+上述对某一路径的拦截是一维的，如果需要多维度认证，使用`access(String)`加SpEL表达式
+
+```java
+protected void configure(HttpSecurity http) {
+    http.authorizeRequests()
+        .antMatchers().access("hasRole('ROLE_ROOT') and hasIpAddress('192.168.1.1')")
+}
+```
+
+
+
+#### 9.3.2 强制通道的安全性
+
+除了`authorizeRequests()`外，`HttpSecurity`还有`requireChannel()`，可强制要求使用https协议传输
+
+```java
+protected void configure(HttpSecurity http) {
+    http.authorizeRequests()
+        .antMatchers().access("hasRole('ROLE_ROOT') and hasIpAddress('192.168.1.1')")
+        .and()
+        .requireChannel().antMatchers().requiresSecure(); //需要https
+}
+requiresInsecure //始终使用http传输
+```
+
+
+
+#### 9.3.3 防止跨站请求伪造
+
+Spring Security通过同步一个token实现CSRF防护的功能，拦截状态变化的请求并检查CSRF token
+
+
+
+### 9.4 认证用户
+
+调用httpSecurity.formLogin()可以提供一个默认的登录页
+
+#### 9.4.1 添加自定义的登录页
+
+
+

@@ -99,7 +99,7 @@ gsonformat
 restfultoolkit
 free-mybatis-plugin
 codeglance
-rainbowbrackets
+rainbow brackets
 
 
 3、自动导包
@@ -154,3 +154,21 @@ setting-auto import-add unambiguous imports on the fly
 		ngx_fastdfs_module;
 	}
 		
+		
+		
+七 elasticsearch
+	1.elasticsearch
+	- rpm 安装
+	更改配置文件: /etc/elasticsearch/elasticsearch.yml
+	server_port: 192.168.145.30
+	- 更改使用的jdk
+	/usr/share/elasticsearch/bin/elasticsearch-env 文件
+	JAVA_HOME="jdk...."
+	
+	
+	2.kibana
+	- rpm安装
+	- 更改配置文件: /etc/kibana/kibana.yml
+	server.host
+	server.port
+	elasticsearchurl
